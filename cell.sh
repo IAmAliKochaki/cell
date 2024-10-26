@@ -45,6 +45,6 @@ if test -z "$lower"; then
 else
 	echo "base=\"$root:$lower:$root.tmp\"" >>$root.sh
 fi
-echo "root=\"\${ROOT+ -R\$base -c00405fb -p0 -g0}\"" >>$root.sh
+echo "root=\"\${ROOT+ -R\$base -c00405fb -u0 -g0}\"" >>$root.sh
 echo "exec $CELL -r\$base $OPTS \$root \"\$@\"" >>$root.sh
 chmod 700 $root.sh
