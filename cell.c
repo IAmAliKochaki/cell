@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 		case 'n':
 			cln_flags |= CLONE_NEWNET;
 			break;
-		case 'p':
+		case 'u':
 			uid = atoi(argv[i][2] ? argv[i] + 2 : argv[++i]);
 			break;
 		case 'g':
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 		printf("Usage: %s [options] init\n\n", argv[0]);
 		printf("Options:\n");
 		printf("  -r root        root directory (ro -r, rw -R, overlay root:lower:work)\n");
-		printf("  -p pid         process pid (%d)\n", uid);
+		printf("  -u pid         process uid (%d)\n", uid);
 		printf("  -g gid         process gid (%d)\n", gid);
 		printf("  -m mnt         mount directory src:dst (ro -m, rw -M)\n");
 		printf("  -t             mount /tmp\n");
