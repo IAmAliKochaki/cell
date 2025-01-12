@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <libgen.h>
 #include <signal.h>
 #include <sched.h>
 #include <stdio.h>
@@ -39,6 +40,8 @@
 #define NMNT		128
 #define NDEV		128
 #define NETH		8
+
+#define LEN(a)		(sizeof(a) / sizeof((a)[0]))
 
 int pivot_root(const char *new_root, const char *put_old);
 int netns_netlink(void);
@@ -75,6 +78,57 @@ static int dupnod(char *src)
 	return 0;
 }
 
+static int writefile(char *dir, char *ent, char *dat)
+{
+	char path[256];
+	int fd;
+	snprintf(path, sizeof(path), "%s/%s", dir, ent);
+	if ((fd = open(path, O_WRONLY)) < 0)
+		return 1;
+	write(fd, dat, strlen(dat));
+	close(fd);
+	return 0;
+}
+
+static int cgroup_limit(char *dir, int pid, char **opts)
+{
+	char ctl[256], grp[256], key[256], dat[32];
+	char *ctls[] = {"memory", "cpu", "pids", "io", "cpuset"};
+	int mark[LEN(ctls)] = {0};
+	char *val;
+	int i, j;
+	for (i = 0; opts[i] != NULL; i++) {
+		for (j = 0; j < LEN(ctls); j++)
+			if (strncmp(ctls[j], opts[i], strlen(ctls[j])) == 0)
+				if (opts[i][strlen(ctls[j])] == '.')
+					mark[j] = 1;
+	}
+	for (i = 0; i < LEN(ctls); i++) {
+		if (mark[i]) {
+			strcat(ctl, " +");
+			strcat(ctl, ctls[i]);
+		}
+	}
+	snprintf(grp, sizeof(grp), "%s", dir);
+	writefile(dirname(grp), "cgroup.subtree_control", ctl);
+	snprintf(dat, sizeof(dat), "%d\n", pid);
+	if (mkdir(dir, 755) < 0 && errno != EEXIST)
+		return 1;
+	if (writefile(dir, "cgroup.procs", dat) != 0)
+		return 1;
+	if (writefile(dir, "cgroup.subtree_control", ctl) != 0)
+		return 1;
+	for (i = 0; opts[i] != NULL; i++) {
+		snprintf(key, sizeof(key), "%s", opts[i]);
+		if ((val = strchr(key, '=')) != NULL) {
+			val[0] = '\0';
+			if (writefile(dir, key, val + 1) != 0)
+				return 1;
+		}
+	}
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	char *init_base[4] = {"/bin/sh"};
@@ -89,6 +143,7 @@ int main(int argc, char *argv[])
 	int rwmnt_n = 0;
 	int veth_n = 0;
 	char *rlim[8];
+	char *cgrp[32];
 	int rlim_n = 0;
 	int mntdev = 0, mntsys = 0;
 	int audio = 0, vgafb = 0, kvm = 0, video = 0;
@@ -130,6 +185,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			rlim[rlim_n++] = argv[i][2] ? argv[i] + 2 : argv[++i];
+			break;
+		case 'L':
+			csplit(cgrp, LEN(cgrp), argv[i][2] ? argv[i] + 2 : argv[++i], ',');
 			break;
 		case 'c':
 			sscanf(argv[i][2] ? argv[i] + 2 : argv[++i], "%lx", &cap);
@@ -180,6 +238,7 @@ int main(int argc, char *argv[])
 		printf("  -df            create framebuffer devices\n");
 		printf("  -dk            create kvm device\n");
 		printf("  -l Xn          set resource limits (p: nproc, f: nofiles, d: data)\n");
+		printf("  -L /grp,key=n  set cgroup v2 limits (i.e., /sys/fs/cgroup/foe,memory.max=1000000)\n");
 		printf("  -c msk         mask of capabilities not to drop\n");
 		printf("  -n             make a new network namespace\n");
 		printf("  -e v1:v2:addr  add a veth pair\n");
@@ -293,6 +352,9 @@ int main(int argc, char *argv[])
 	if (mktmp != NULL && mount("cell-tmp", "tmp", "tmpfs",
 			MS_NOSUID | MS_NODEV | MS_NOATIME, mktmp) < 0)
 		die("mount tmp failed");
+	/* set cgroup limits */
+	if (cgrp[0] && cgroup_limit(cgrp[0], getpid(), cgrp + 1) != 0)
+		die("cannot set cgroup limits");
 	/* switching the root */
 	if (pivot_root(".", ".") < 0)
 		die("pivot_root failed");
