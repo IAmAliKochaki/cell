@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 	char *rlim[8];
 	char *cgrp[32];
 	int rlim_n = 0;
-	int mntdev = 0, mntsys = 0;
+	int mntdev = 0, mntsys = 0, mntcgroup = 0;
 	int audio = 0, vgafb = 0, kvm = 0, video = 0;
 	char *mktmp = NULL;
 	int uid = 99, gid = 99;
@@ -214,7 +214,10 @@ int main(int argc, char *argv[])
 				kvm = 1;
 			break;
 		case 's':
-			mntsys = 1;
+			if (argv[i][2] == '\0')
+				mntsys = 1;
+			if (argv[i][2] == 'g')
+				mntcgroup = 1;
 			break;
 		default:
 			argc = 1;
@@ -233,6 +236,7 @@ int main(int argc, char *argv[])
 		printf("  -t             mount /tmp\n");
 		printf("  -s             mount host's /sys (unsafe)\n");
 		printf("  -d             mount host's /dev (unsafe)\n");
+		printf("  -sg            mount cgroup2 filesystem in /sys/fs/cgroup\n");
 		printf("  -da            create audio devices\n");
 		printf("  -dv            create video capture devices\n");
 		printf("  -df            create framebuffer devices\n");
@@ -348,6 +352,11 @@ int main(int argc, char *argv[])
 		mount("cell-dev", "dev", "devtmpfs", MS_NOSUID | MS_NOEXEC | MS_NOATIME, NULL);
 	if (mntsys)
 		mount("cell-sys", "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NOATIME, NULL);
+	if (mntcgroup) {
+		mkdir("sys/fs", 0755);
+		mkdir("sys/fs/cgroup", 0755);
+		mount("cell-cgroup", "sys/fs/cgroup", "cgroup2", MS_NOSUID | MS_NOEXEC | MS_NOATIME, NULL);
+	}
 	/* mount /tmp */
 	if (mktmp != NULL && mount("cell-tmp", "tmp", "tmpfs",
 			MS_NOSUID | MS_NODEV | MS_NOATIME, mktmp) < 0)
