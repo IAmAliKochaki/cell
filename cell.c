@@ -44,10 +44,6 @@
 #define LEN(a)		(sizeof(a) / sizeof((a)[0]))
 
 int pivot_root(const char *new_root, const char *put_old);
-int netns_netlink(void);
-int netns_move(int fd, char *dev, int netns);
-int netns_veth(int fd, char *v1, char *v2);
-int netns_ifup(char *ifname, unsigned addr, unsigned mask);
 
 static void die(char *msg)
 {
@@ -138,6 +134,7 @@ int main(int argc, char *argv[])
 	char *romnt[NMNT][4];
 	char *rwmnt[NMNT][4];
 	char *veth[NETH][4];
+	char *netns = NULL;
 	unsigned veth_ip[NETH];
 	int romnt_n = 0;
 	int rwmnt_n = 0;
@@ -160,7 +157,10 @@ int main(int argc, char *argv[])
 	for (i = 1; i < argc && argv[i][0] == '-'; i++) {
 		switch (argv[i][1]) {
 		case 'n':
-			cln_flags |= CLONE_NEWNET;
+			if (argv[i][2])
+				netns = argv[i] + 2;
+			else
+				cln_flags |= CLONE_NEWNET;
 			break;
 		case 'u':
 			uid = atoi(argv[i][2] ? argv[i] + 2 : argv[++i]);
@@ -244,8 +244,8 @@ int main(int argc, char *argv[])
 		printf("  -l Xn          set resource limits (p: nproc, f: nofiles, d: data)\n");
 		printf("  -L /grp,key=n  set cgroup v2 limits (i.e., /sys/fs/cgroup/foe,memory.max=1000000)\n");
 		printf("  -c msk         mask of capabilities not to drop\n");
-		printf("  -n             make a new network namespace\n");
-		printf("  -e v1:v2:addr  add a veth pair\n");
+		printf("  -n             create a new network namespace\n");
+		printf("  -nnetns        switch to the given named network namespace\n");
 		return 0;
 	}
 	/* keep the network namespace of the parent */
@@ -256,23 +256,15 @@ int main(int argc, char *argv[])
 	/* create a new namespace */
 	if (unshare(cln_flags) < 0)
 		die("unshare failed");
-	/* set up the network namespace */
-	if (cln_flags & CLONE_NEWNET)
-		netns_ifup("lo", 0x0100007f, 0x000000ff);
-	if (veth_n > 0) {
-		int nofd = open("/proc/self/ns/net", O_RDONLY);
-		int nlfd = netns_netlink();
-		for (i = 0; i < veth_n; i++) {
-			netns_veth(nlfd, veth[i][0], veth[i][1]);
-			netns_ifup(veth[i][1], veth_ip[i] + 0x01000000, 0x00ffffff);
-			netns_move(nlfd, veth[i][0], nsfd);
-			setns(nsfd, CLONE_NEWNET);
-			netns_ifup(veth[i][0], veth_ip[i], 0x00ffffff);
-			setns(nofd, CLONE_NEWNET);
-		}
-		close(nofd);
+	/* change the network namespace */
+	if (netns) {
+		char path[256];
+		int nsfd;
+		snprintf(path, sizeof(path), "/var/run/netns/%s", netns);
+		nsfd = open(path, O_RDONLY);
+		if (nsfd < 0 || setns(nsfd, CLONE_NEWNET) < 0)
+			die("changing netns failed");
 		close(nsfd);
-		close(nlfd);
 	}
 	/* make FS private */
 	if (mount("none", "/", NULL, MS_REC | MS_PRIVATE, NULL) < 0)
@@ -325,7 +317,7 @@ int main(int argc, char *argv[])
 		dupnod("/dev/dsp2");
 		if (snd != NULL) {
 			struct dirent *dp;
-			char path[128];
+			char path[256];
 			while ((dp = readdir(snd)) != NULL) {
 				snprintf(path, sizeof(path), "/dev/snd/%s", dp->d_name);
 				dupnod(path);
