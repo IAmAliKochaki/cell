@@ -368,7 +368,7 @@ int main(int argc, char *argv[])
 		gid_t groups[] = {gid};
 		char *envs[] = {"USER=foe", "HOME=/foe", "TERM=linux", "PS1=> ",
 			"LD_LIBRARY_PATH=/opt/lib", "EDITOR=vi",
-			"PATH=/foe/bin:/opt/bin:/bin:/sbin:/usr/bin", NULL};
+			"PATH=/foe/bin:/opt/bin:/bin:/sbin:/usr/bin:/usr/sbin", NULL};
 		if (mount("none", "proc", "proc", 0, NULL) < 0)
 			die("mount proc failed");
 		if (setgroups(1, groups) < 0)
