@@ -2,14 +2,14 @@
 # Make a sandbox directory and generate a script to run cell
 
 # cell program path
-CELL="/path/to/cell/cell"
+CELL="${CELL:-/path/to/cell/cell}"
 # rootfs archive to extract
-ROOTFS="/path/to/rootfs.tar.gz"
+ROOTFS="${ROOTFS:-/path/to/rootfs.tar.gz}"
 # rootfs files to copy
-ROOTCP="/more/root/files/dir"
+ROOTCP="${ROOTCP:-/more/root/files/dir}"
 
 # additional options to pass to cell
-OPTS="-t -lp100 -lf100 -ld100000000"
+CELLOPTS="${CELLOPTS:--t -lp100 -lf100 -ld100000000}"
 
 root="$1"
 lower="$2"
@@ -46,5 +46,5 @@ else
 	echo "base=\"$root:$lower:$root.tmp\"" >>$root.sh
 fi
 echo "root=\"\${ROOT+ -R\$base -c00405fb -u0 -g0}\"" >>$root.sh
-echo "exec $CELL -r\$base $OPTS \$root \"\$@\"" >>$root.sh
+echo "exec $CELL -r\$base $CELLOPTS \$root \"\$@\"" >>$root.sh
 chmod 700 $root.sh
