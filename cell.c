@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
 	/* set cgroup limits */
 	if (cgrp[0] && cgroup_limit(cgrp[0], getpid(), cgrp + 1) != 0)
 		die("cannot set cgroup limits");
-	/* switching the root */
+	/* switch to the new root */
 	if (pivot_root(".", ".") < 0)
 		die("pivot_root failed");
 	if (umount2(".", MNT_DETACH) < 0)
@@ -394,11 +394,9 @@ int main(int argc, char *argv[])
 		execve(init[0], init, envs);
 		exit(1);
 	}
-	printf("cell: %d -> %d\n", getpid(), pid);
 	/* wait for the child */
 	while (1) {
 		int cp = wait(NULL);
-		printf("cell: %d exited\n", cp);
 		if (cp == pid)
 			break;
 	}
