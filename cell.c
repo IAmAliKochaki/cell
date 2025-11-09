@@ -108,7 +108,7 @@ static int cgroup_limit(char *dir, int pid, char **opts)
 	snprintf(grp, sizeof(grp), "%s", dir);
 	writefile(dirname(grp), "cgroup.subtree_control", ctl);
 	snprintf(dat, sizeof(dat), "%d\n", pid);
-	if (mkdir(dir, 755) < 0 && errno != EEXIST)
+	if (mkdir(dir, 0755) < 0 && errno != EEXIST)
 		return 1;
 	if (writefile(dir, "cgroup.procs", dat) != 0)
 		return 1;
